@@ -20,6 +20,23 @@
 #    include "timer.h"
 #endif // CHARYBDIS_AUTO_POINTER_LAYER_TRIGGER_ENABLE
 
+typedef enum {
+     TD_NONE,
+     TD_UNKNOWN,
+     TD_SINGLE_TAP,
+     TD_SINGLE_HOLD,
+     TD_DOUBLE_TAP,
+     TD_DOUBLE_HOLD,
+     TD_DOUBLE_SINGLE_TAP, // Send two single taps
+     TD_TRIPLE_TAP,
+     TD_TRIPLE_HOLD
+ } td_state_t;
+ 
+ typedef struct {
+     bool is_press_action;
+     td_state_t state;
+ } td_tap_t;
+
 enum charybdis_keymap_layers {
     LAYER_BASE = 0,
     LAYER_LOWER,
@@ -36,6 +53,8 @@ enum charybdis_keymap_layers {
  enum custom_keycodes {
      NEW_TAB = SAFE_RANGE,
  };
+
+ td_state_t cur_dance(tap_dance_state_t *state);
  
  // For the x tap dance. Put it here so it can be used in any keymap
  void x_finished(tap_dance_state_t *state, void *user_data);
@@ -81,7 +100,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├──────────────────────────────────────────────────────┤ ├──────────────────────────────────────────────────────┤
        KC_LCTL,    PT_Z,    KC_X,    KC_C,    KC_V,    KC_B,       KC_N,    KC_M, KC_COMM,  KC_DOT, PT_SLSH, KC_BSLS,
   // ╰──────────────────────────────────────────────────────┤ ├──────────────────────────────────────────────────────╯
-                                   KC_LGUI, KC_SPC,   LW_NT,      RAISE,  KC_ENT,
+                                   KC_LGUI, KC_SPC,   TD(LOWER_NT),      RAISE,  KC_ENT,
                                            TD(ALT_LR), KC_BSPC,     KC_DEL
   //                            ╰───────────────────────────╯ ╰──────────────────╯
   ),
@@ -188,7 +207,59 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
    }
 
 
+   td_state_t cur_dance(tap_dance_state_t *state) {
+     if (state->count == 1) {
+         if (state->interrupted || !state->pressed) return TD_SINGLE_TAP;
+         // Key has not been interrupted, but the key is still held. Means you want to send a 'HOLD'.
+         else return TD_SINGLE_HOLD;
+     } else if (state->count == 2) {
+         // TD_DOUBLE_SINGLE_TAP is to distinguish between typing "pepper", and actually wanting a double tap
+         // action when hitting 'pp'. Suggested use case for this return value is when you want to send two
+         // keystrokes of the key, and not the 'double tap' action/macro.
+         if (state->interrupted) return TD_DOUBLE_SINGLE_TAP;
+         else if (state->pressed) return TD_DOUBLE_HOLD;
+         else return TD_DOUBLE_TAP;
+     }
+ 
+     // Assumes no one is trying to type the same letter three times (at least not quickly).
+     // If your tap dance key is 'KC_W', and you want to type "www." quickly - then you will need to add
+     // an exception here to return a 'TD_TRIPLE_SINGLE_TAP', and define that enum just like 'TD_DOUBLE_SINGLE_TAP'
+     if (state->count == 3) {
+         if (state->interrupted || !state->pressed) return TD_TRIPLE_TAP;
+         else return TD_TRIPLE_HOLD;
+     } else return TD_UNKNOWN;
+ }
+ 
+ // Create an instance of 'td_tap_t' for the 'x' tap dance.
+ static td_tap_t xtap_state = {
+     .is_press_action = true,
+     .state = TD_NONE
+ };
+ 
+ void lnt_finished(tap_dance_state_t *state, void *user_data) {
+     xtap_state.state = cur_dance(state);
+     switch (xtap_state.state) {
+         case TD_SINGLE_TAP: layer_on(LAYER_LOWER); break;
+         case TD_SINGLE_HOLD: layer_on(LAYER_LOWER); break;
+         case TD_DOUBLE_TAP: register_code(KC_LCTL); tap_code(KC_T);break;
+         case TD_DOUBLE_HOLD: layer_on(LAYER_LOWER); break;
+         default: break;
+     }
+ }
+ 
+ void lnt_reset(tap_dance_state_t *state, void *user_data) {
+     switch (xtap_state.state) {
+         case TD_SINGLE_TAP: layer_off(LAYER_LOWER); break;
+         case TD_SINGLE_HOLD: layer_off(LAYER_LOWER); break;
+         case TD_DOUBLE_TAP: unregister_code(KC_LCTL); break;
+         case TD_DOUBLE_HOLD: layer_off(LAYER_LOWER); break;
+         default: break;
+     }
+     xtap_state.state = TD_NONE;
+ }
+
+
 tap_dance_action_t tap_dance_actions[] = {
      [ALT_LR] = ACTION_TAP_DANCE_DOUBLE(KC_LALT, KC_RALT),
-     [LOWER_NT] = ACTION_TAP_DANCE_DOUBLE(LOWER, NEW_TAB)
+     [LOWER_NT] = ACTION_TAP_DANCE_FN_ADVANCED(NULL, lnt_finished, lnt_reset)
  };

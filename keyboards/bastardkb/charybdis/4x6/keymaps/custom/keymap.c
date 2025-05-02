@@ -60,6 +60,7 @@ static uint16_t auto_pointer_layer_timer = 0;
 #define RAISE MO(LAYER_RAISE)
 #define PT_Z LT(LAYER_POINTER, KC_Z)
 #define PT_SLSH LT(LAYER_POINTER, KC_SLSH)
+#define LW_NT LT (LAYER_LOWER, NEW_TAB)
 
 #ifndef POINTING_DEVICE_ENABLE
 #    define DRGSCRL KC_NO
@@ -80,8 +81,8 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├──────────────────────────────────────────────────────┤ ├──────────────────────────────────────────────────────┤
        KC_LCTL,    PT_Z,    KC_X,    KC_C,    KC_V,    KC_B,       KC_N,    KC_M, KC_COMM,  KC_DOT, PT_SLSH, KC_BSLS,
   // ╰──────────────────────────────────────────────────────┤ ├──────────────────────────────────────────────────────╯
-                                   KC_LGUI, KC_SPC,   LOWER,      RAISE,  KC_ENT,
-                                           TD(ALT_LR), KC_BSPC,     NEW_TAB
+                                   KC_LGUI, KC_SPC,   LW_NT,      RAISE,  KC_ENT,
+                                           TD(ALT_LR), KC_BSPC,     KC_DEL
   //                            ╰───────────────────────────╯ ╰──────────────────╯
   ),
 
@@ -176,20 +177,15 @@ void rgb_matrix_update_pwm_buffers(void);
 bool process_record_user(uint16_t keycode, keyrecord_t *record) {
      switch (keycode) {
        case NEW_TAB:
+       if (record->event.pressed) {
            register_code(KC_LCTL);
-           register_code(KC_T);
+           tap_code(KC_T);
+       } else {
+          unregister_code(KC_LCTL);
+       }
      }
      return true;
    }
-
-
-   void post_process_record_user(uint16_t keycode, keyrecord_t *record) {
-    switch (keycode) {
-      case NEW_TAB:
-          unregister_code(KC_T);
-          unregister_code(KC_LCTL);
-    }
-  }  
 
 
 tap_dance_action_t tap_dance_actions[] = {

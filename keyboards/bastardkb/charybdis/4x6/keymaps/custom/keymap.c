@@ -47,7 +47,8 @@ enum charybdis_keymap_layers {
  // Tap dance enums
  enum {
      ALT_LR,
-     LOWER_NT
+     LOWER_NT,
+     SPACE_CT
  };
 
  enum custom_keycodes {
@@ -99,7 +100,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
   // ├──────────────────────────────────────────────────────┤ ├──────────────────────────────────────────────────────┤
        KC_LCTL,    PT_Z,    KC_X,    KC_C,    KC_V,    KC_B,       KC_N,    KC_M, KC_COMM,  KC_DOT, PT_SLSH, KC_BSLS,
   // ╰──────────────────────────────────────────────────────┤ ├──────────────────────────────────────────────────────╯
-                                   KC_LGUI, KC_SPC,   TD(LOWER_NT),      RAISE,  KC_ENT,
+                                   KC_LGUI, TD(SPACE_CT),   TD(LOWER_NT),      RAISE,  KC_ENT,
                                            TD(ALT_LR), KC_BSPC,     KC_DEL
   //                            ╰───────────────────────────╯ ╰──────────────────╯
   ),
@@ -222,7 +223,8 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
      } else return TD_UNKNOWN;
  }
  
- // Create an instance of 'td_tap_t' for the 'x' tap dance.
+
+ //LOWER_NT tap dance
  static td_tap_t lnttap_state = {
      .is_press_action = true,
      .state = TD_NONE
@@ -250,8 +252,38 @@ bool process_record_user(uint16_t keycode, keyrecord_t *record) {
      lnttap_state.state = TD_NONE;
  }
 
+//SPACE_CT tap dance
+  static td_tap_t stctap_state = {
+    .is_press_action = true,
+    .state = TD_NONE
+};
+
+void stc_finished(tap_dance_state_t *state, void *user_data) {
+    stctap_state.state = cur_dance(state);
+    switch (stctap_state.state) {
+        case TD_SINGLE_TAP: tap_code(KC_SPC); break;
+        case TD_SINGLE_HOLD: register_code(KC_SPC); break;
+        case TD_DOUBLE_TAP: register_code(KC_LCTL); tap_code(KC_TAB);break;
+        case TD_DOUBLE_HOLD: register_code(KC_SPC); break;
+        default: break;
+    }
+}
+
+void stc_reset(tap_dance_state_t *state, void *user_data) {
+    switch (stctap_state.state) {
+        case TD_SINGLE_TAP: break;
+        case TD_SINGLE_HOLD:unregister_code(KC_SPC); break;
+        case TD_DOUBLE_TAP: unregister_code(KC_LCTL); break;
+        case TD_DOUBLE_HOLD: unregister_code(KC_SPC); break;
+        default: break;
+    }
+    stctap_state.state = TD_NONE;
+}
+
+
 
 tap_dance_action_t tap_dance_actions[] = {
      [ALT_LR] = ACTION_TAP_DANCE_DOUBLE(KC_LALT, KC_RALT),
-     [LOWER_NT] = ACTION_TAP_DANCE_FN_ADVANCED(NULL, lnt_finished, lnt_reset)
+     [LOWER_NT] = ACTION_TAP_DANCE_FN_ADVANCED(NULL, lnt_finished, lnt_reset),
+     [SPACE_CT] = ACTION_TAP_DANCE_FN_ADVANCED(NULL, stc_finished, stc_reset)
  };
